@@ -30,15 +30,15 @@ require 'ostruct'
 include REXML
 
 #$proj_dir = '/../'
-$proj_filename = 'Puzzle.csproj'
-$proj_dir = '/../'
+$project_filename = 'Puzzle.csproj'
+$project_directory = '/../'
 
 class String
   def camelize
-    self.to_s.gsub(/\/(.?)/) { 
-      "::" + $1.upcase 
-    }.gsub(/(^|_)(.)/) { 
-      $2.upcase 
+    self.to_s.gsub(/\/(.?)/) {
+      "::" + $1.upcase
+    }.gsub(/(^|_)(.)/) {
+      $2.upcase
     }
   end
 
@@ -68,61 +68,61 @@ class GeneratorBase
   end
 end
 
-at_exit do 
-  gen = GeneratorBase.create_instance
-  puts
-  puts gen.desc
-  puts
-  gen.generate
-  files = gen.files
+at_exit do
+  generator = GeneratorBase.create_instance
+  puts nil
+  puts generator.desc
+  puts nil
+  generator.generate
+  files = generator.files
 
-  bag = {}
-  gen.instance_variables.each do |var|
-    bag[var.to_s.gsub('@','')] = gen.instance_eval(var.to_s)
+  data = {}
+  generator.instance_variables.each do |var|
+    data[var.to_s.gsub('@','')] = generator.instance_eval(var.to_s)
   end
-  bag = ErbBinding.new(bag)
+  data_struct = ErbBinding.new(data)
 
-  basedir = File.dirname(__FILE__)
-  out_dir = basedir + $proj_dir
-  proj_filename = $proj_filename
-  in_dir =  basedir + "/templates/#{gen.class.to_s.underscore.gsub('_generator','')}/"
+  base_directory= File.dirname(__FILE__)
+  output_directory = base_directory + $project_directory
+  project_filename = $project_filename
+  input_directory =  base_directory + "/templates/#{generator.class.to_s.underscore.gsub('_generator','')}/"
 
   files.each do |file|
-    puts "generating #{out_dir + file[:out]}"
-    File.open(in_dir + file[:in], 'r') do |inf|
-      template = ERB.new(inf.read)
-      File.open(out_dir + file[:out], 'w') do |outf|
-        binding = bag.send(:get_binding)
-        outf.write(template.result(binding))
+    puts "generating #{output_directory + file[:out]}"
+    File.open(input_directory + file[:in], 'r') do |input_file|
+      template = ERB.new(input_file.read)
+      File.open(output_directory + file[:out], 'w') do |output_file|
+        binding = data_struct.send(:get_binding)
+        output_file.write(template.result(binding))
       end
     end
   end
 
-  doc = nil
-  File.open(out_dir + proj_filename, 'r') do |proj_file|
-    doc = Document.new(proj_file)
+  document = nil
+  File.open(output_directory + project_filename, 'r') do |project_file|
+      document = Document.new(project_file)
   end
 
-  include_el = XPath.first(doc.root, '//VisualStudioProject/CSHARP/Files/Include')
+  include_el = XPath.first(  document.root, '//VisualStudioProject/CSHARP/Files/Include')
   if include_el.nil?
     puts 'Include element not found in project file'
     exit 2
   end
 
   files.each do |file|
-    puts "adding #{out_dir + file[:out]} to #{proj_filename}"
-    opts = file.reject { |k,v| [:in,:out].include?(k) }
-    opts[:rel_path] = file[:out].gsub("/","\\")
+    puts "adding #{output_directory + file[:out]} to #{project_filename}"
+    options = file.reject { |k,v| [:in,:out].include?(k) }
+    options[:rel_path] = file[:out].gsub("/","\\")
     attributes = Hash.new
-    opts.each do |k,v|
+    options.each do |k,v|
       attributes[k.to_s.camelize] = v
     end
     include_el.add_element('File', attributes)
   end
 
   puts 'storing project file'
-  File.open(out_dir + proj_filename, 'wb') do |proj_file|
-    VisualStudioProjFileWriter.new(:doc => doc).write(proj_file)
+  File.open(output_directory + project_filename, 'wb') do |proj_file|
+    VisualStudioProjFileWriter.new(:doc =>   document).write(proj_file)
   end
 
   puts "Hit ENTER to exit"
