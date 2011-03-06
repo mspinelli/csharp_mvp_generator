@@ -21,10 +21,11 @@
 # THE SOFTWARE.
 
 require File.dirname(__FILE__) + '/config/environment.rb'
+require_relative 'lib/visual_studio_proj_file_writer'
+require_relative 'lib/prompt'
+require_relative 'lib/erb_binding'
 require 'erb'
-require 'prompt'
 require 'rexml/document'
-require 'visual_studio_proj_file_writer'
 require 'ostruct'
 include REXML
 
@@ -77,9 +78,9 @@ at_exit do
 
   bag = {}
   gen.instance_variables.each do |var|
-    bag[var.gsub('@','')] = gen.instance_eval(var)
+    bag[var.to_s.gsub('@','')] = gen.instance_eval(var.to_s)
   end
-  bag = OpenStruct.new(bag)
+  bag = ErbBinding.new(bag)
 
   basedir = File.dirname(__FILE__)
   out_dir = basedir + $proj_dir
@@ -91,7 +92,8 @@ at_exit do
     File.open(in_dir + file[:in], 'r') do |inf|
       template = ERB.new(inf.read)
       File.open(out_dir + file[:out], 'w') do |outf|
-        outf.write(template.result(bag.send(:binding)))
+        binding = bag.send(:get_binding)
+        outf.write(template.result(binding))
       end
     end
   end
